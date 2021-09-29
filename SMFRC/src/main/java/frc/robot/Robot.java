@@ -76,12 +76,17 @@ public class Robot extends TimedRobot {
   /** This function is called once when teleop is enabled. */
   @Override
   public void teleopInit() {
-    drive.setPID(1,1);
+    drive.setPID(0.5,0.5);
+    // drive.setPID(-0.5,-0.5);
   }
 
   /** This function is called periodically during operator control. */
   @Override
   public void teleopPeriodic() {
+    System.out.print(drive.leftE.getPosition());
+    System.out.print(" ");
+    System.out.println(drive.rightE.getPosition());
+
     drive.runPID();
     // drive.RC();
   }
