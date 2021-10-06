@@ -51,17 +51,17 @@ public class Drive {
     right1 = new CANSparkMax(11, MotorType.kBrushless);
     setSpark(right1);
     right1.setInverted(true);
-    right2 = new WPI_TalonSRX(2);
+    right2 = new WPI_TalonSRX(1);
     right2.setInverted(true);
-    right3 = new WPI_TalonSRX(1);
+    right3 = new WPI_TalonSRX(2);
     right3.setInverted(true);
     JS = new Joystick(0);
 
     rightE = right1.getEncoder();
     leftE = left1.getEncoder();
 
-    leftCPM = 18.38; //prev: 17.28
-    rightCPM = 17.85; //prev: 19.6
+    leftCPM = 21.4032; //prev: 20.58
+    rightCPM = 22.61056; //prev: 20.188
 
     prevTime=0.0;
     leftPrevError = 0.0;
@@ -116,14 +116,18 @@ public class Drive {
   public void runPID(){
     double leftError = leftTar - leftE.getPosition(); // Error = Target - Actual
     double rightError = rightTar - rightE.getPosition();
-    // System.out.print(leftError);
-    // System.out.print(" ");
-    // System.out.println(rightError);
+    System.out.println("Left Error: " + leftError + " Right Error: " + rightError);
+
     double t = timer.get()-prevTime;
     prevTime = timer.get();
 
-    double leftSpeed = computePID(leftError, leftInt, leftPrevError, t, 1.0, 0.0, 0.024); //prev: 1, 0, 0.28
-    double rightSpeed = computePID(rightError, rightInt, rightPrevError, t, 1.0, 0.0, 0.014); // prev: 1, 0, 0.016
+    double pidL = computePID(leftError, leftInt, leftPrevError, t, 1.0, 0.0, 0.024); //prev: 1, 0, 0.28
+    double pidR = computePID(rightError, rightInt, rightPrevError, t, 1.0, 0.0, 0.014); // prev: 1, 0, 0.016
+    System.out.println("Left PID " + pidL + " Right pidR: " + pidR);
+
+    double leftSpeed = mapValue(-20, 20, -1, 1, pidL);
+    double rightSpeed = mapValue(-20, 20, -1, 1, pidR);
+    System.out.println("Left Speed: " + leftSpeed + " Right Speed: " + rightSpeed);
 
     leftPrevError = leftError;
     rightPrevError = rightError;
@@ -135,11 +139,15 @@ public class Drive {
     //integral += (error*.02); // Integral is increased by the error*time (which is .02 seconds using normal IterativeRobot)
     // I doubt intergral is going to work since we are only working on one side.
     double derivative = (error - prevError) / t;
-    System.out.println(derivative);
-    System.out.println(t);
+    // System.out.println(derivative);
+    // System.out.println(t);
     // double derivative =0;
     double outPut = P*error + I*integral + D*derivative;
     return outPut;
+  }
+
+  public void turn(double angle){
+
   }
 
   private void setSpark(final CANSparkMax spark) {
@@ -148,6 +156,22 @@ public class Drive {
     spark.setClosedLoopRampRate(0.4);
     // spark.enableVoltageCompensation(12.0);
     spark.setSmartCurrentLimit(40);
+  }
+
+  private double mapValue(double inLow, double inHigh, double outLow, double outHigh, double ip){
+    double n = ip;
+    if(n>inHigh){
+      n = inHigh;
+    }else if(n < inLow){
+      n = inLow;
+    }
+
+    n = n - inLow;
+    n = n / (inHigh-inLow);
+    n = n * (outHigh-outLow);
+    n = n + outLow;
+
+    return n;
   }
 
 }
