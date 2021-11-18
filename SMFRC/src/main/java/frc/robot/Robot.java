@@ -20,7 +20,6 @@ public class Robot extends TimedRobot {
   private String m_autoSelected;
   private final SendableChooser<String> m_chooser = new SendableChooser<>();
 
-  Drive drive = new Drive();
   /**
    * This function is run when the robot is first started up and should be used for any
    * initialization code.
@@ -74,21 +73,35 @@ public class Robot extends TimedRobot {
   }
 
   /** This function is called once when teleop is enabled. */
+  Drive drive = new Drive();
+  Drive turn = new Drive();
+  Drive move = new Drive();
+  Drive stop = new Drive();
+
   @Override
   public void teleopInit() {
-    drive.setPID(0.5,0.5);
-    // drive.setPID(-0.5,-0.5);
+    move.setMove(0.5,0.5);
+    turn.setTurn(90);
+    
   }
 
+  private static boolean notStarted = true;
   /** This function is called periodically during operator control. */
   @Override
   public void teleopPeriodic() {
-    System.out.print(drive.leftE.getPosition());
-    System.out.print(" ");
-    System.out.println(drive.rightE.getPosition());
+    if(drive.startButton.get()) notStarted = false;
+    move.move(notStarted);
+    turn.turn(move.finished);
+    stop.stop(turn.finished);
 
-    drive.runPID();
+    
+    // System.out.print(drive.leftE.getPosition());
+    // System.out.print(" ");
+    // System.out.println(drive.rightE.getPosition());
+
+    // drive.move();
     // drive.RC();
+
   }
 
   /** This function is called once when the robot is disabled. */

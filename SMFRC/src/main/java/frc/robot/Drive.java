@@ -2,12 +2,15 @@ package frc.robot;
 
 import com.revrobotics.CANEncoder;
 import com.revrobotics.CANSparkMax;
+// import com.revrobotics.CANSparkMax.IdleMode;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
-
+// import com.ctre.phoenix.motorcontrol.NeutralMode;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
+import com.ctre.phoenix.sensors.*;
 
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj2.command.button.JoystickButton;
 
 public class Drive {
   
@@ -21,8 +24,10 @@ public class Drive {
 
   public static Joystick JS;
 
-  public CANEncoder leftE;
-  public CANEncoder rightE;
+  public static CANEncoder leftE;
+  public static CANEncoder rightE;
+
+  public boolean finished;
 
   public double leftZero;
   public double rightZero;
@@ -35,9 +40,13 @@ public class Drive {
   public Double rightInt;
   public Double leftPrevError;
   public Double rightPrevError;
+
   public Double prevTime;
 
   public Timer timer;
+
+  public JoystickButton eStopTriger;
+  public JoystickButton startButton;
 
   public Drive(){
     left1 = new CANSparkMax(12, MotorType.kBrushless);
@@ -52,10 +61,16 @@ public class Drive {
     setSpark(right1);
     right1.setInverted(true);
     right2 = new WPI_TalonSRX(1);
-    right2.setInverted(true);
+    right2.setInverted(false);
     right3 = new WPI_TalonSRX(2);
     right3.setInverted(true);
+
+    
     JS = new Joystick(0);
+    eStopTriger = new JoystickButton(JS, 1);
+    startButton = new JoystickButton(JS, 2);
+
+    IMU = new PigeonIMU(right2);
 
     rightE = right1.getEncoder();
     leftE = left1.getEncoder();
@@ -66,54 +81,64 @@ public class Drive {
     prevTime=0.0;
     leftPrevError = 0.0;
     rightPrevError = 0.0;
+
+    timer = new Timer();
+    timer.start();
   }
 
   public void RC(){
     double X = -0.5*JS.getRawAxis(1);
     double Y = 0.5*JS.getRawAxis(0);
 
-    double leftSpeed = 0;
-    double rightSpeed = 0;
+    System.out.println(X);
+    System.out.println(Y);
+
+    double leftSpeed;
+    double rightSpeed;
     
     leftSpeed = X + Y;
     rightSpeed = X - Y;
 
-    move(leftSpeed, rightSpeed);
+    go(leftSpeed, rightSpeed);
   }
 
-  public void move(Double leftSpeed, Double rightSpeed ){
+  public void go(Double leftSpeed, Double rightSpeed ){
 
-    //System.out.print(JS.getRawAxis(1));
-    //System.out.print(" ");
-    //System.out.println(JS.getRawAxis(0));
-    //System.out.print(leftSpeed);
+    // System.out.println(JS.getRawAxis(1));
+    // System.out.println(JS.getRawAxis(0));
+    // System.out.println(leftSpeed);
     // System.out.print(" ");
     // System.out.println(rightSpeed);
+    // left1.setIdleMode(IdleMode.kCoast);
+    // left2.setNeutralMode(NeutralMode.Coast);
     left1.set(leftSpeed);
     left2.set(leftSpeed);
     left3.set(leftSpeed);
 
+
+    // right1.setIdleMode(IdleMode.kCoast);
+    // right2.setNeutralMode(NeutralMode.Coast);
     right1.set(rightSpeed);
     right2.set(rightSpeed);
     right3.set(rightSpeed);
   }
 
-  public void setZero(){
+  public void encoderSetZero(){
     leftZero = leftE.getPosition();
     rightZero = rightE.getPosition();
   }
 
-  public void setPID(double leftMeter, double rightMeter){
-    setZero();
+  public void setMove(double leftMeter, double rightMeter){
+    encoderSetZero();
     leftTar = leftZero + leftMeter*leftCPM;
     rightTar = rightZero + rightMeter*rightCPM;
     leftInt=0.0;
     rightInt=0.0;
-    timer = new Timer();
-    timer.start();
   }
 
-  public void runPID(){
+  public void move(boolean prevFinished){
+    if(!prevFinished) return;
+    if(finished) return;
     double leftError = leftTar - leftE.getPosition(); // Error = Target - Actual
     double rightError = rightTar - rightE.getPosition();
     System.out.println("Left Error: " + leftError + " Right Error: " + rightError);
@@ -125,14 +150,69 @@ public class Drive {
     double pidR = computePID(rightError, rightInt, rightPrevError, t, 1.0, 0.0, 0.014); // prev: 1, 0, 0.016
     System.out.println("Left PID " + pidL + " Right pidR: " + pidR);
 
-    double leftSpeed = mapValue(-20, 20, -1, 1, pidL);
-    double rightSpeed = mapValue(-20, 20, -1, 1, pidR);
+    double leftSpeed = mapValue(-20, 20, -0.7, 0.7, pidL);
+    double rightSpeed = mapValue(-20, 20, -0.7, 0.7, pidR);
     System.out.println("Left Speed: " + leftSpeed + " Right Speed: " + rightSpeed);
 
     leftPrevError = leftError;
     rightPrevError = rightError;
 
-    move(leftSpeed, rightSpeed);
+    go(leftSpeed, rightSpeed);
+
+    if(leftError + rightError < 0.7) finished = true;
+  }
+  
+  public PigeonIMU IMU;
+  public double gyroZero;
+  public double gyroTar;
+  public double prevGyro;
+  public double gyroInt;
+  public double gyroPrevError;
+
+  public void setTurn(double angle){
+    double [] xyz_deg = new double[3];
+    IMU.getAccumGyro(xyz_deg);
+    gyroZero = xyz_deg[2];
+    // System.out.println(gyroZero);
+    gyroTar = gyroZero + angle;
+
+    gyroInt = 0;
+    gyroPrevError = 0;
+
+    prevTime = 0.0;
+  }
+
+  public void turn(boolean prevFinished){
+    if(!prevFinished) return;
+    if(finished) return;
+    double [] xyz_deg = new double[3];
+    IMU.getAccumGyro(xyz_deg);
+
+    double gyro = xyz_deg[2];
+
+    // System.out.println(gyroTar);
+    // System.out.println(gyro);
+    System.out.println(xyz_deg[0] + " " + xyz_deg[1] + " " + xyz_deg[2]);
+
+    double gyroError = gyroTar - gyro; // Error = Target - Actual
+
+    // System.out.println(timer.get());
+
+    double t = timer.get()-prevTime;
+    prevTime = timer.get();
+
+    double pid = computePID(gyroError, gyroInt, gyroPrevError, t, 1.0, 0.0, 0.11); // prev: 1, 0, 0.016
+
+    double leftSpeed = mapValue(-20, 20, 0.3, -0.3, pid);
+    double rightSpeed = mapValue(-20, 20, -0.3, 0.3, pid);
+    System.out.println("Left Speed: " + leftSpeed + " Right Speed: " + rightSpeed);
+    System.out.println("Error: " + gyroError);
+    gyroPrevError = gyroError;
+
+    go(leftSpeed, rightSpeed);
+
+    if(gyroError < 0.005) finished = true;
+    System.out.println("Turn stoped");
   }
 
   public double computePID(double error, Double integral, Double prevError, Double t, Double P, Double I, Double D){
@@ -146,8 +226,10 @@ public class Drive {
     return outPut;
   }
 
-  public void turn(double angle){
-
+  public void stop(boolean started){
+    if(started){
+      go(0.0,0.0);
+    }
   }
 
   private void setSpark(final CANSparkMax spark) {
