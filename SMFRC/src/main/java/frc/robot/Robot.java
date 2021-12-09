@@ -78,22 +78,23 @@ public class Robot extends TimedRobot {
   Drive move = new Drive();
   Drive stop = new Drive();
 
+  Drive2 d2 = Drive2.getInstance();
+
   @Override
   public void teleopInit() {
-    move.setMove(0.5,0.5);
-    turn.setTurn(90);
-    
+    // move.setMove(0.5,0.5);
+    // turn.setTurn(90);
+
   }
 
   private static boolean notStarted = true;
   /** This function is called periodically during operator control. */
   @Override
   public void teleopPeriodic() {
-    if(drive.startButton.get()) notStarted = false;
-    move.move(notStarted);
-    turn.turn(move.finished);
-    stop.stop(turn.finished);
-
+    // if(drive.startButton.get()) notStarted = false;
+    // move.move(notStarted);
+    // turn.turn(move.finished);
+    // stop.stop(turn.finished);
     
     // System.out.print(drive.leftE.getPosition());
     // System.out.print(" ");
@@ -101,6 +102,8 @@ public class Robot extends TimedRobot {
 
     // drive.move();
     // drive.RC();
+
+    d2.track();
 
   }
 
